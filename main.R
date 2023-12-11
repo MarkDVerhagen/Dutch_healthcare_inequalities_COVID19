@@ -27,6 +27,7 @@
 #   - patchwork
 #   - showtext
 #   - readxl
+#   - glmmTMB
 #
 # Author: Mark Verhagen
 # Date: 11-12-2023
@@ -39,6 +40,7 @@ library(ggrepel)
 library(ggtext)
 library(patchwork)
 library(showtext)
+library(glmmTMB)
 
 font_add_google("Lato")
 showtext_auto()
@@ -51,7 +53,6 @@ data_dir <- file.path('data', 'timeseries')
 source("plot_functions.R")
 source("src/functions.R")
 
-var_groups <- c('total', 'female', 'age_group', 'background_group', 'poverty')
 dvs <- c("n_s", "n_person_s")
 treat_year <- 2020
 exclude_covid <- T
@@ -193,6 +194,65 @@ ggsave(plt, filename = paste0(
 
 
 # Appendix plots ----------------------------------------------------------
+
+## SI-1 Multivariate regression plot
+data_interact <- fetch_data_plots(name = "all_all", linear = F, treat_year = 2020,
+                                  version = "_v3", dir = data_dir,
+                                  var_groups = c("full_interact"))
+## Generate covariates
+df <- make_covs(data_interact)
+
+## Standard covariates
+reg_controls <- paste0(
+  c("(1|var_name)", ## Random effects
+    "as.factor(age)", "as.factor(female)", "as.factor(poverty)", "as.factor(native)", ## Demographics
+    "as.factor(holidays)", "as.factor(week)", "year_fe"), ## Temporal controls
+  collapse = "+")
+
+outcome <- "n_person_s"
+overall_pandemic <- "pandemic"
+
+## Pandemic and demographic interactions
+overall_pandemic_int <- paste0(
+  overall_pandemic, "+",
+  overall_pandemic, "*as.factor(poverty)", "+",
+  overall_pandemic, "*as.factor(native)", "+",
+  overall_pandemic, "*as.factor(female)", "+",
+  overall_pandemic, "*as.factor(age)"
+)
+
+waves_pandemic <- c("wave_1", "wave_2", "wave_3",
+                    "interwave_1", "interwave_2")
+
+## Pandemic waves and demographic interactions
+waves_pandemic_int <- paste0(
+  paste0(waves_pandemic, collapse = "+"), "+",
+  paste0(paste0(waves_pandemic, "*as.factor(poverty)"), collapse ="+"), "+",
+  paste0(paste0(waves_pandemic, "*as.factor(native)"), collapse ="+"), "+",
+  paste0(paste0(waves_pandemic, "*as.factor(female)"), collapse ="+"), "+",
+  paste0(paste0(waves_pandemic, "*as.factor(age)"), collapse ="+"))
+
+## Model 1: overall treatment effect since COVID-19 started
+model_1 <- as.formula(
+  paste0(outcome, "~", reg_controls, "+", overall_pandemic))
+
+model_1_int <- as.formula(
+  paste0(outcome, "~", reg_controls, "+", overall_pandemic_int
+        ))
+
+## Model 2: wave-by-wave treatment effect since COVID-19 started
+model_2 <- as.formula(
+  paste0(outcome, "~", reg_controls, "+",
+        paste0(waves_pandemic, collapse = "+")))
+
+model_2_int <- as.formula(
+  paste0(outcome, "~", reg_controls, "+", waves_pandemic_int))
+
+ggsave(plot_reg(df[df$urgency_type == "all", ], model_1_int, model_2_int)[[2]], filename = paste0(
+  "figs/SI_1_multivariate_reg.png"
+), width = 15, height = 10)
+
+## Load alternative datasets for SI figures
 data_placebo <- fetch_data_plots("all_all", linear = F, treat_year = 2019,
                                  version = "_v3") %>%
   filter(year <= 2019)
