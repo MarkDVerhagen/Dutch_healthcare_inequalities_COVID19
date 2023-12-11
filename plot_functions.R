@@ -74,67 +74,6 @@ theme_update(
   legend.position = "none"
 )
 
-#' Function to fetch data and make predictions
-#'
-#' @param name Name of file
-#' @param linear Boolean whether to assume linear year tred
-#' @param treat_year Treatment start
-#' @param controls Control variables
-#' @param interacted Whether to do interacted analysis
-#' @param nb Whether to use a negative binomial regression
-#' @param version Version
-#' @param dir Data directory
-fetch_data_plots <- function(name, 
-                             linear = F, 
-                             treat_year = 2020,
-                             var_groups = c(
-                               'total',
-                               'female',
-                               'age_group',
-                               'background_group',
-                               'poverty'),
-                             controls = c(
-                               "as.factor(week)",
-                               "holidays",
-                               "ndays",
-                               "year_lin"),
-                             interacted = F,
-                             nb = F,
-                             version = "",
-                             dir = file.path("data", "timeseries")) {
-  
-  data_file <- paste0(name, version, ".xlsx")
-  
-  data <- readxl::read_xlsx(file.path(dir, data_file)) %>%
-    as.data.table()
-  
-  ## Order urgency and omit "none" urgency
-  data$urgency_type <- factor(data$urgency_type, levels = c("high", "rest", "low", "none", "all"))
-  
-  # data <- data[data$year <= treat_year, ]
-  
-  data_inc_pred <- bind_rows(lapply(unique(data$urgency_type), function(u) {
-    temp <- data[data$urgency_type == u, ]
-    temp %>%
-      include_predictions(
-        linear = linear, treat_year = treat_year,
-        dvs = c("n_s", "n_person_s", "n_person"),
-        controls = controls,
-        nb = nb
-      ) %>%
-      return()
-  }))
-
-  # remove all but relevant var_groups
-  data_inc_pred <- data_inc_pred %>%
-    filter(var_group %in% var_groups)
-  
-  # change week date to date class
-  data_inc_pred <- data_inc_pred %>%
-    mutate(week_date = as.Date(week_date))
-  
-  return(data_inc_pred)
-}
 
 # CUMULATIVE PLOT ---------------------------------------------------------
 
