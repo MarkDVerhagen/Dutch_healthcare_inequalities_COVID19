@@ -16,7 +16,7 @@
 # Output Files:
 #   1. Procedures Data (per year): 'data/edit/procedures_nl_{year}_v3.rda'
 #   2. Demographic Data Summary: 'data/output/desc_demog_by_year_v3.xlsx'
-#   3. Full Demographic Data: 'data/edit/dem_full.rda'
+#   3. Full Demographic Data: 'data/edit/dem_full_v3.rda'
 #
 # Libraries Used:
 #   - tidyverse
@@ -279,4 +279,4 @@ year_desc <- rbind(
 writexl::write_xlsx(year_desc, "data/output/desc_demog_by_year_v3.xlsx")
 
 #Save demography file
-save(dem_full, file = "data/edit/dem_full.rda")
+save(dem_full, file = "data/edit/dem_full_v3.rda")
