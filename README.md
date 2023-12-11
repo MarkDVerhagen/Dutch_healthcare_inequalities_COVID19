@@ -52,6 +52,7 @@ To generate the plots, run `main.R`. To generate the tables, run `desc.R`. In th
     ├── LICENSE
     ├── README.md
     ├── data
+    │   └── timeseries
     ├── desc.R
     ├── figs
     ├── plot_functions.R
