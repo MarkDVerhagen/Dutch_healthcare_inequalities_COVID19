@@ -65,11 +65,10 @@ for(dataname in all_files) {
     for (t in unique(data$urgency_type)) {
       tab <- count_table(data, y, subtype = t, var_groups, percent = percent)
       write_csv(tab, 
-                file = paste0("tables", "/", 
-                              "main", "/",
-                              y_name, "/", 
-                              treat_year, "/", 
-                              dataname, "/",
+                file = paste0("tables",
+                              y_name, "_", 
+                              treat_year, "_", 
+                              dataname, "_",
                               "table_",
                               t, "_",
                               if (percent) {
