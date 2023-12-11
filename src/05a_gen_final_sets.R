@@ -78,9 +78,6 @@ save(df_high, df_high_act, df_high_act_2, df_high_act_15,
      file = "./data/final_v3/high_sets_v3.rda")
 
 ## Low urgency
-activity_types <- list(c(1, 79, 5, 3, 19, 2, 7, 4),
-                       c(1, 79, 5, 3, 19, 2),
-                       c(19, 3, 5), c(7, 4))
 df_low <- fread("./data/final_v3/df_low_v3.csv.gz")
 
 df_low_2 <- df_low[medical_type == 2,]
@@ -99,9 +96,6 @@ save(df_low, df_low_act, df_low_act_2, df_low_act_15,
      file = "./data/final_v3/low_sets_v3.rda")
 
 ## Rest urgency
-activity_types <- list(c(1, 79, 5, 3, 19, 2, 7, 4),
-                       c(1, 79, 5, 3, 19, 2),
-                       c(19, 3, 5), c(7, 4))
 df_rest <- fread("./data/final_v3/df_rest_v3.csv.gz")
 
 df_rest_2 <- df_rest[medical_type == 2,]
@@ -120,9 +114,6 @@ save(df_rest, df_rest_act, df_rest_act_2, df_rest_act_15,
      file = "./data/final_v3/rest_sets_v3.rda")
 
 ## None urgency
-activity_types <- list(c(1, 79, 5, 3, 19, 2, 7, 4),
-                       c(1, 79, 5, 3, 19, 2),
-                       c(19, 3, 5), c(7, 4))
 df_none <- fread("./data/final_v3/df_none_v3.csv.gz")
 
 df_none_2 <- df_none[medical_type == 2, ]
