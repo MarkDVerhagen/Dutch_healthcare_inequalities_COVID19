@@ -1,4 +1,30 @@
-## Produce low level weekly series to be fetched pre-plotting
+####################################################################################
+# Script: Generate weekly counts per medical and demographic subset
+# Description: This script generates counts by demographic and medical subsets
+#
+# Input Files:
+#   1. Functions: './src/functions.R'
+#   2. Full Demographic Data (v3): 'data/edit/dem_full_v3.rda'
+#   3. Activity Data Sets for All Urgency Levels: 
+#       - './data/final_v3/sets_v3.rda'
+#       - './data/final_v3/low_sets_v3.rda'
+#       - './data/final_v3/high_sets_v3.rda'
+#       - './data/final_v3/rest_sets_v3.rda'
+#       - './data/final_v3/none_sets_v3.rda'
+#
+# Output Files:
+#   The script generates several datasets based on the combinations of urgency levels,
+#   medical types, and demographic groups. These datasets are used for downstream
+#   analysis and are not explicitly saved within this script.
+#
+# Libraries Used:
+#   - tidyverse
+#   - data.table
+#
+# Author: Mark Verhagen
+# Date: 11-12-2023
+####################################################################################
+
 
 ## Load libraries
 library(tidyverse)
