@@ -1,29 +1,65 @@
-## Script to generate set of activities for analysis which includes DBC diagnosis, activity type and
-## urgency.
+####################################################################################
+# Script: Activity and Demographic Analysis
+# Description: This script generates yearly sets of activities for analysis, which include
+#              DBC diagnosis, activity type, and urgency. It also generates yearly demographics
+#
+# Input Files:
+#   1. Functions: './src/functions.R'
+#   2. Urgency Classification: 'data/edit/urgency_classification.rds'
+#   3. DBC Classification Data: 'data/helper/20200319; versie 4-1F patientengroepen NZa.xlsx'
+#   4. Activity Classification: 'data/edit/activity_classification.rds'
+#   5. Health Activities Data (2016-2021): 'data/raw/health_activities/MSZZorgactiviteitenVEKT{year}_trim.rds'
+#   6. Health Products Data (2016-2021): 'data/raw/health_procedures/health_codes_{year}.rds'
+#   7. COVID DBC IDs (2020, 2021): './data/edit/covid_dbc_ids_{year}.rda'
+#   8. Demographic Data (2016-2020): 'data/raw/demographics/{year}/rin_demog.rds'
+#
+# Output Files:
+#   1. Procedures Data (per year): 'data/edit/procedures_nl_{year}_v3.rda'
+#   2. Demographic Data Summary: 'data/output/desc_demog_by_year_v3.xlsx'
+#   3. Full Demographic Data: 'data/edit/dem_full.rda'
+#
+# Libraries Used:
+#   - tidyverse
+#   - data.table
+#
+# Author: Mark Verhagen
+# Date: 10-12-2023
+####################################################################################
 
-## Load libraries
 library(tidyverse)
 library(data.table)
+
+## Booleans what to generate
+procedures <- T
+demographic <- F
+
+years <- c(2016:2021)
+
 source("./src/functions.R")
 
-procedures <- F
-demographic <- T
-# sample <- T
-years <- 2016:2020
+## Setup paths
+raw_dir <- file.path("data", "raw")
+edit_dir <- file.path("data", "edit")
 
 ## Load activity classification crosswalks for Urgency level and Activity type
-urgency_classification <- read_rds("data/edit/urgency_classification.rds") %>%
+urgency_classification <- read_rds(file.path(edit_dir, "urgency_classification.rds")) %>%
   as.data.table()
+
+## Update to 2021
+urgency_classification <- urgency_code_2021(urgency_classification)
+
+## Add merge code for urgency classification to health products
 urgency_classification[, merge_urgency := paste0(str_pad(specialisation, 4, "left", "0"), "-",
                                                  str_pad(diagnosis_dddd, 4, "left", "0"), "-",
                                                  as.character(health_product))]
 
-# There are 6 duplicate codes, all same urgency
+# There are 6 duplicate codes, all same urgency > omit duplicates
 urgency_classification <- urgency_classification[!duplicated(urgency_classification$merge_urgency), ]
 
 ## Load DBC classification data
-dbc_d_classification <- readxl::read_xlsx("H:/data/raw/20200319; versie 4-1F patientengroepen NZa.xlsx",
-                                          sheet = "DBC-doelgroepNZa_koppeltabel") %>%
+dbc_d_classification <- readxl::read_xlsx(
+  file.path(helper_dir, "20200319; versie 4-1F patientengroepen NZa.xlsx"),
+            sheet = "DBC-doelgroepNZa_koppeltabel") %>%
   rename(NZA_DIAGNOSE = DIAGNOSE,
          NZA_SPEC_CODE = SPEC_CODE,
          NZA_HOOFDGROEP = `Hoofdgroep code`) %>%
@@ -34,45 +70,55 @@ dbc_d_classification <- readxl::read_xlsx("H:/data/raw/20200319; versie 4-1F pat
   ))
 
 ## Load activity classification
-activity_classification <- read_rds("data/edit/activity_classification.rds") %>%
+activity_classification <- read_rds(
+  file.path(helper_dir, "./data/edit/activity_classification.rds")) %>%
   as.data.table()
 
 ## Define demography data.table to fill
 dem_full <- data.table()
 
 for(year in years) {
+  
   if(procedures) {
     print(paste("Getting health data for year: ", year))
     
     ## Data on health activities 
-    activity_data <- read_rds(paste0("data/raw/health_activities/MSZZorgactiviteitenVEKT", year, "_trim.rds")) %>%
+    activity_data <- read_rds(
+      file.path(raw_dir,
+                paste0("health_activities/MSZZorgactiviteitenVEKT", year, "_trim.rds"))) %>%
       select(-VEKTMSZUitvoerendSpecialisme) %>%
       as.data.table()
     
     n_activity <- nrow(activity_data)
     
     # Rename cols
-    setnames(activity_data, c("RINPERSOON", "VEKTMSZKoppelIDPrestZa", "VEKTMSZZorgactiviteitdatum",
-                              "VEKTMSZZorgactiviteit"),
-             c("rinpersoon", "dbc_id", "activity_date", "activity"))
+    names(activity_data) <- tolower(names(activity_data))
+    setnames(activity_data, c("vektmszkoppelidprestza", "vektmszzorgactiviteitdatum",
+                              "vektmszzorgactiviteit"),
+             c("dbc_id", "activity_date", "activity"))
     
     # Transform person_id to numeric
     activity_data[, rinpersoon := as.numeric(rinpersoon)]
     
     ## Data on health products
-    product_data <- read_rds(paste0("data/raw/health_procedures/health_codes_", year, ".rds")) %>%
+    product_data <- read_rds(file.path(raw_dir,
+                                       paste0("health_procedures/health_codes_", year, ".rds"))) %>%
       as.data.table()
     
     # Rename cols
-    setnames(product_data, c("RINPERSOON", "VEKTMSZDBCZorgproduct", "VEKTMSZKoppelIDPrestZa"),
-             c("rinpersoon", "health_product", "dbc_id"))
+    names(product_data) <- tolower(names(product_data))
+    setnames(product_data, c("vektmszdbczorgproduct", "vektmszkoppelidprestza"),
+             c("health_product", "dbc_id"))
     product_data[, c("rinpersoon", "health_product") := list(as.numeric(rinpersoon), as.numeric(health_product))]
     product_data <- merge_NZA_classification(product_data, dbc_d_classification)
     
-    # Unit tests
-    assertthat::assert_that(!any(duplicated(product_data$dbc_id))) ## DBC_ids are unique
-    assertthat::assert_that(mean(activity_data$dbc_id %in% product_data$dbc_id) > 0.9999) ## All activities have a DBC in products
-    assertthat::assert_that(mean(activity_data$rinpersoon %in% product_data$rinpersoon) > 0.9999) ## All individuals with an activity have a product
+    ## Unit tests 
+    # DBC_ids are unique
+    assertthat::assert_that(!any(duplicated(product_data$dbc_id)))
+    # All activities have a DBC in products
+    assertthat::assert_that(mean(activity_data$dbc_id %in% product_data$dbc_id) > 0.9999)
+    # All individuals with an activity have a product
+    assertthat::assert_that(mean(activity_data$rinpersoon %in% product_data$rinpersoon) > 0.9999)
     
     # Merge: Only look at procedures (both product and activity)
     activity_data_merged <- activity_data[product_data, on = c("dbc_id"), nomatch = 0]
@@ -80,7 +126,8 @@ for(year in years) {
     ## Separate out all procedures without dbc codes
     ozp_data <- product_data[!(product_data$dbc_id %in% activity_data_merged$dbc_id), ]
     
-    print(paste0("Percentage of 9999 diagnoses in other products: ", mean(ozp_data$VEKTMSZSpecialismeDiagnoseCombin == "9999-99-99-9999")))
+    print(paste0("Percentage of 9999 diagnoses in other products: ",
+                 mean(ozp_data$vektmszspecialismediagnosecombin == "9999-99-99-9999")))
     print(paste0("Percentage of other products: ", nrow(ozp_data) / nrow(product_data)))
     
     rm(product_data, activity_data)
@@ -93,8 +140,8 @@ for(year in years) {
     print(mean(is.na(activity_data_merged$activity_type))) ## Number of activities missing activity types
     
     # Merge with urgency data
-    activity_data_merged[, merge_urgency := paste0(str_sub(VEKTMSZSpecialismeDiagnoseCombin, 1, 4), "-",
-                                            str_sub(VEKTMSZSpecialismeDiagnoseCombin, 12, 15), "-",
+    activity_data_merged[, merge_urgency := paste0(str_sub(vektmszspecialismediagnosecombin, 1, 4), "-",
+                                            str_sub(vektmszspecialismediagnosecombin, 12, 15), "-",
                                             health_product)]
     
     activity_data_merged <- merge(activity_data_merged, urgency_classification[, c("urgency", "merge_urgency")],
@@ -106,9 +153,9 @@ for(year in years) {
     activity_data_merged$year <- lubridate::year(activity_data_merged$activity_date)
     
     ## add covid dbc indicator
-    if (year == 2020) {
+    if (year %in% c(2020, 2021)) {
       ## load Covid DBC ids
-      load("./data/edit/covid_dbc_ids.rda")
+      load(paste0("./data/edit/covid_dbc_ids_", year, ".rda"))
       activity_data_merged[, covid_activity_dbc := dbc_id %in%
                       covid_dbc_ids]
     } else {
@@ -116,23 +163,24 @@ for(year in years) {
     }
     
     #Save
-    save(activity_data_merged, file = paste0("data/edit/procedures_nl_", year, "_v2.rda"))
-    save(ozp_data, file = paste0("data/edit/ozp_nl_", year, ".rda"))
-    rm(activity_data_merged, activity_data_merged_sub, ozp_data)
+    save(activity_data_merged, file =
+         file.path(edit_dir, paste0("procedures_nl_", year, "_v3.rda")))
     gc()
   }
   
   if (demographic) {
     
-    if (year != 2020) {
+    if (year != 2021) {
       ## Start with year 2016 and make it the demography file for 2017 data
-      ## Stop with year 2019, which is demography for 2020
+      ## Stop with year 2020, which is demography for 2021
       
       # DEMOGRAPHIC DATA
       print(paste("Getting demographic data for year: ", year + 1))
       
       # read demographic data
-      dem <- readRDS(paste0("data/raw/demographics/", year, "/rin_demog.rds")) %>%
+      dem <- readRDS(file.path(
+        raw_dir,
+        paste0("demographics/", year, "/rin_demog.rds"))) %>%
         as.data.table()
       
       names(dem) <- gsub("_\\d{4}", "", names(dem))
@@ -150,83 +198,44 @@ for(year in years) {
   }
 }
 
-## Include custom income
-numeric_income <- lapply(c(2016:2019), FUN = function(x) {
-  read_rds(paste0("H:/data/numeric_income/", x, "/rin_num_income.rds")) %>%
-    mutate(year = x + 1)
-})
-
-numeric_income_assigned <- lapply(numeric_income, classify_income)
-rm(numeric_income)
-gc()
-
-numeric_income_assigned_comb <- bind_rows(numeric_income_assigned)
-numeric_income_assigned_comb$year <- as.numeric(numeric_income_assigned_comb$year)
-
-numeric_income_assigned_comb <- numeric_income_assigned_comb %>%
-  as.data.table()
-
-rm(numeric_income_assigned)
-gc()
-
-## Also use new income classes for demographics
-dem_full[, rinpersoon := as.numeric(rinpersoon)]
-
-setkey(numeric_income_assigned_comb, rinpersoon, year)
-setkey(dem_full, rinpersoon, year)
-
-dem_full <- merge(dem_full, numeric_income_assigned_comb, all.x = T)
-table(dem_full$income_class)
-dem_full$income_class[is.na(dem_full$income_class)] <- "Other"
-table(dem_full$income_class)
-
-dem_full$income_group <- dem_full$income_class
-
 # clean demographic data ####
 setnames(dem_full, "leeftijd", "age")
 
-dem_full <- dem_full[,
-                     c("female", "age_group",
-                       "background_group"
-                     ) :=
-                       list(geslacht == "vrouw",
-                            case_when(
-                              age < 18 ~ "0-17",
-                              age < 30 ~ "18-29",
-                              age < 66 ~ "30-65",
-                              age < 76 ~ "66-75",
-                              TRUE ~ "76+"
-                            ),
-                            case_when(
-                              herkomst %in%
-                              c("Nederland", "Autochtoon") ~ "cit_dutch",
-                              herkomst %in%
-                              c("Overige westerse migratieachtergrond",
-                                "Westers allochtoon",
-                                "Europa (exclusief Nederland)",
-                                "Poolse migratieachtergrond of MOE-landers") ~ "cit_west",
-                              herkomst %in%
-                              c("Overige niet-westers allochtoon",
-                                "Overige niet westerse migratieachtergrond",
-                                "Somalische migratieachtergrond",
-                                "Syrische migratieachtergrond") ~ "cit_non_west",
-                              herkomst %in%
-                              c("Marokko", "Turkije", "Suriname",
-                                "Nederlands Antillen en Aruba") ~ "cit_diaspora"
-                              )
-                       )]
+dem_full <- dem_full[
+  ,
+  c("female", "age_group", "background_group") :=
+  list(geslacht == "vrouw",
+       case_when(
+         age < 18 ~ "0-17",
+         age < 30 ~ "18-29",
+         age < 66 ~ "30-65",
+         age < 76 ~ "66-75",
+         TRUE ~ "76+"
+        ),
+       case_when(
+         herkomst %in% c("Nederland", "Autochtoon") ~ "cit_dutch",
+         herkomst %in% c("Overige westerse migratieachtergrond",
+                         "Westers allochtoon",
+                         "Europa (exclusief Nederland)",
+                         "Poolse migratieachtergrond of MOE-landers") ~ "cit_west",
+         herkomst %in% c("Overige niet-westers allochtoon",
+                         "Overige niet westerse migratieachtergrond",
+                         "Somalische migratieachtergrond",
+                         "Syrische migratieachtergrond") ~ "cit_non_west",
+         herkomst %in% c("Marokko", "Turkije", "Suriname", "Nederlands Antillen en Aruba") ~ "cit_diaspora"
+         ))]
 
 ## Remove the original variables
 dem_full <- dem_full %>%
   select(-geslacht, -herkomst, -huishoudsamenstelling, -inkomen_klasse, -wc, -bc,
          -herkomst_eerstegen, -inkomen_pers, -income_class)
 
-# check share of respondents across groups
-# prop.table(table(dem_full$year , dem_full$female), 1)
-# prop.table(table(dem_full$year , dem_full$income_group), 1)
-# prop.table(table(dem_full$year , dem_full$background_group), 1)
-# prop.table(table(dem_full$year , dem_full$age_group), 1)
-# prop.table(table(dem_full$year , dem_full$poverty), 1)
+## Check share of respondents across groups
+prop.table(table(dem_full$year , dem_full$female), 1)
+prop.table(table(dem_full$year , dem_full$income_group), 1)
+prop.table(table(dem_full$year , dem_full$background_group), 1)
+prop.table(table(dem_full$year , dem_full$age_group), 1)
+prop.table(table(dem_full$year , dem_full$poverty), 1)
 
 
 year_desc <- rbind(
@@ -267,7 +276,7 @@ year_desc <- rbind(
            group = "age")
 )
 
-writexl::write_xlsx(year_desc, "data/output/desc_demog_by_year.xlsx")
+writexl::write_xlsx(year_desc, "data/output/desc_demog_by_year_v3.xlsx")
 
-#Save
-save(dem_full, file = paste0("data/edit/dem_full.rda"))
+#Save demography file
+save(dem_full, file = "data/edit/dem_full.rda")
