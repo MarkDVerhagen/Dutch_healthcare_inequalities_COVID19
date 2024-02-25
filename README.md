@@ -16,7 +16,10 @@ Preparatory analyses has been done within the Remote Access (RA) environment of 
 
 ### Remote Access Environment
 
-All intermittent data files are generated using the scripts in the `./src_ra/` folder, ran on the RA environment of the CBS. The scripts assume the following data structure within the RA environment:
+All intermittent data files are generated using the scripts in the `./src_ra/` folder, ran on the RA environment of the CBS. The analysis is performed in five phases, each of which are described below.
+
+###### Phase 0: Data preparation
+The scripts assume the following data structure within the RA environment after running `00_prep_data.R`.
 
     └── health_access
         └── data
@@ -55,18 +58,48 @@ All intermittent data files are generated using the scripts in the `./src_ra/` f
                 └── 20200319; versie 4-1F patientengroepen NZa.xlsx
 
 
-### Run
+After running `./src_ra/00d_identify_covid.R` additional datafiles `./data/edit/covid_dbc_ids_2020.rda` and `./data/edit/covid_dbc_ids_2021.rda` are added. These reflect all activities that are associated with a COVID-19 hospitalization.
 
-To generate the plots, run `main.R`. To generate the tables, run `desc.R`. In the files, you need to specify: 1. Data files 2. Treatment year 3. Dependent variable 4. Variable Groups 5. Whether or not to exclude COVID
+###### Phase 1: Generate formatted yearly procedure and demographic data
 
-### Project structure
+Script `01_gen_data.R` generates yearly procedure and demographic data.
 
-    ├── LICENSE
-    ├── README.md
-    ├── data
-    │   └── timeseries
-    ├── desc.R
-    ├── figs
-    ├── plot_functions.R
-    ├── main.R
-    └── tables
+###### Phase 2: Merge procedure and demographic data
+
+Script `02_merge_data.R` combines procedure and demographic data.
+
+###### Phase 3: Generate descriptive tables
+
+Script `03_desc_tables.R` generates demographic descriptives for each year.
+
+###### Phase 4: Make COVID timeseries
+
+Script `04a_make_covid_timeseries.R` makes weekly counts of individuals in hospital with COVID-19. Script `04b_make_covid_deaths.R` makes weekly counts of individuals that died with COVID-19 as main cause of death.
+
+###### Phase 5: Generate weekly data files for export
+
+Script `05a_gen_final_sets.R` makes activity subsets based on urgency, activity and medical subsets. Script `05b_make_activity_counts.R` generates weekly activity timeseries for age- and sex-standardized subsets.
+
+###### Export from RA environment
+
+The below export file has been exported from the CBS RA environment. The `data` folder is assumed to be present in the root of this repository in generating the final figures.
+
+    └── export_file
+        └── data
+            ├── all_all_v3.xlsx
+            ├── all_Onc_v3.xlsx
+            ├── all_Trauma_v3.xlsx
+            ├── RelDiag_all_v3.xlsx
+            ├── RelDiag_Onc_v3.xlsx
+            ├── RelDiag_Trauma_v3.xlsx
+            ├── Intense_all_v3.xlsx
+            ├── Intense_Onc_v3.xlsx
+            ├── Intense_Trauma_v3.xlsx
+            ├── dem_table_num_v3.xlsx
+            ├── covid_deaths_v3.xlsx
+            └── interact_table.xlsx
+     
+### Local scripts
+
+To generate the plots, run `./src/main.R`. To generate the tables, run `./src/desc.R`.
+
